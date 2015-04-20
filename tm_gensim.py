@@ -1,5 +1,6 @@
 #https://gist.github.com/aronwc/8248457
 import numpy as np
+import time
  
 from gensim import matutils
 from gensim.models.ldamodel import LdaModel
@@ -54,8 +55,10 @@ if (__name__ == '__main__'):
    #shuffles the data so it's in random order
    rand = np.random.mtrand.RandomState(8675309)
    cats = ['rec.sport.baseball', 'sci.crypt']
-   all_data = fetch_20newsgroups(categories=cats,shuffle=True,random_state=rand, remove=('headers', 'footers', 'quotes'))
-   vec = CountVectorizer(min_df=10, stop_words='english')
+#   all_data = fetch_20newsgroups(categories=cats,shuffle=True,random_state=rand, remove=('headers', 'footers', 'quotes'))
+   all_data = fetch_20newsgroups(shuffle=True,random_state=rand, remove=('headers', 'footers', 'quotes'))
+#   vec = CountVectorizer(min_df=10, stop_words='english')
+   vec = CountVectorizer(stop_words='english')
    tdm_all = vec.fit_transform(all_data.data)
    vocab = vec.get_feature_names()
    
@@ -63,7 +66,11 @@ if (__name__ == '__main__'):
    # Fit LDA.
    num_topics = 10
    num_passes = 10
+
+   # Time the fit_lda process
+   start_time = time.time()
    lda = fit_lda(tdm_all, vocab, num_topics, num_passes)
+   print("fit_lda ran in %s seconds" % (time.time() - start_time))
 
    #print out LDA topics
    print_topics(lda,vocab,num_topics)
