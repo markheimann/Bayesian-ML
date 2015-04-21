@@ -55,25 +55,26 @@ if (__name__ == '__main__'):
    #shuffles the data so it's in random order
    rand = np.random.mtrand.RandomState(8675309)
    cats = ['rec.sport.baseball', 'sci.crypt']
-#   all_data = fetch_20newsgroups(categories=cats,shuffle=True,random_state=rand, remove=('headers', 'footers', 'quotes'))
-   all_data = fetch_20newsgroups(shuffle=True,random_state=rand, remove=('headers', 'footers', 'quotes'))
-#   vec = CountVectorizer(min_df=10, stop_words='english')
-   vec = CountVectorizer(stop_words='english')
+   all_data = fetch_20newsgroups(categories=cats,shuffle=True,random_state=rand, remove=('headers', 'footers', 'quotes'))
+#   all_data = fetch_20newsgroups(shuffle=True,random_state=rand, remove=('headers', 'footers', 'quotes'))
+   vec = CountVectorizer(min_df=10, stop_words='english')
+#   vec = CountVectorizer(stop_words='english')
    tdm_all = vec.fit_transform(all_data.data)
    vocab = vec.get_feature_names()
    
    #Topic modeling 
    # Fit LDA.
-   num_topics = 10
+   num_topics = [2,4,6,8,10,20]
    num_passes = 10
 
-   # Time the fit_lda process
-   start_time = time.time()
-   lda = fit_lda(tdm_all, vocab, num_topics, num_passes)
-   print("fit_lda ran in %s seconds" % (time.time() - start_time))
+   for num in num_topics:
+      # Time the fit_lda process
+      start_time = time.time()
+      lda = fit_lda(tdm_all, vocab, num, num_passes)
+      print("fit_lda ran in %s seconds" % (time.time() - start_time))
 
-   #print out LDA topics
-   print_topics(lda,vocab,num_topics)
+      #print out LDA topics
+      print_topics(lda,vocab,num_topics)
 
 
    #Classification using LDA topics as features
