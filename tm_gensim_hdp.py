@@ -4,6 +4,7 @@ import time
  
 from gensim import matutils
 from gensim.models.ldamodel import LdaModel
+from gensim.models.hdpmodel import HdpModel
 from sklearn import linear_model
 from sklearn.datasets import fetch_20newsgroups
 from sklearn.feature_extraction.text import CountVectorizer
@@ -40,16 +41,28 @@ def fit_lda(X, vocab, num_topics=5, passes=20):
    return LdaModel(matutils.Sparse2Corpus(X), num_topics=num_topics,
                     passes=passes,
                     id2word=dict([(i, s) for i, s in enumerate(vocab)]))
- 
- 
-def print_topics(lda, vocab, n=10):
+
+def print_topics_lda(lda, vocab, n=10):
    """ Print the top words for each topic. """
    topics = lda.show_topics(num_topics=n, formatted=False)
    for ti, topic in enumerate(topics):
       print 'topic %d: %s' % (ti, ' '.join('%s/%.2f' % (t[1], t[0]) for t in topic))
- 
- 
+
+def fit_hdp(X, vocab, num_topics=10, passes=20):
+   """ Fit HDP From a scipy CSR matrix (X). """
+   print 'fitting hdp...'
+   return HdpModel(matutils.Sparse2Corpus(X), id2word=dict([(i,s) for i, s in enumerate(vocab)]))
+
+def print_topics_hdp(hdp, n_topics=10, passes=20):
+   """ Print the words for number of topics specified """
+   topics = hdp.print_topics(topics=n_topics, topn = passes)
+   for ti, topic in enumerate(topics):
+      print 'topic %d: %s' % (ti, ' '.join('%s/%.2f' % (t[1], t[0]) for t in topic))
+
+
 if (__name__ == '__main__'):
+
+
    # Load data.
    #allows you to specify which categories you want
    #shuffles the data so it's in random order
@@ -70,14 +83,24 @@ if (__name__ == '__main__'):
    for num in num_topics:
       # Time the fit_lda process
       start_time = time.time()
-      lda = fit_lda(tdm_all, vocab, num, num_passes)
+      #lda = fit_lda(tdm_all, vocab, num, num_passes)
       print("fit_lda ran in %s seconds" % (time.time() - start_time))
 
       #print out LDA topics
-      print_topics(lda,vocab,num_topics)
+      #print_topics_lda(lda,vocab,num_topics)
 
 
-   #Classification using LDA topics as features
+   # Attempt to make hdp work
+   hdp = fit_hdp(tdm_all, vocab)
+   for num in num_topics:
+      print_topics_hdp(hdp,num,num_passes)
+
+      
+      
+   
+
+
+  #Classification using LDA topics as features
    #Possibly compare to document classification using the term-document counts as features (which is much higher dimensional)?
 
    #Split into training and test data
