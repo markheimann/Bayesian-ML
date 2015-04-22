@@ -100,7 +100,7 @@ if (__name__ == '__main__'):
 
    print "distribution of topics for documents: "
    lda_topic_dists = [lda[corpus[i]] for i in range(0,num_docs)]
-   lda_dists_matrix = [ [term[1] for term in topic_dist ] for topic_dist in lda_topic_dists]
+   lda_dists_matrix = [ [(topic_dist[i][1] if i < len(topic_dist) and topic_dist[i][0] == i else 0) for i in range(num_topics)] for topic_dist in lda_topic_dists]
    print len(lda_dists_matrix)
    print len(lda_dists_matrix[0])  
    #Classification using LDA topics as features
