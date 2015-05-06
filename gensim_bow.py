@@ -12,6 +12,8 @@ from sklearn.feature_extraction.text import CountVectorizer
 from collections import defaultdict
 import string
 from stemming.porter2 import stem
+import matplotlib.pyplot as plt
+import math
 
 '''Machine learning methods''' 
 
@@ -165,40 +167,53 @@ if (__name__ == '__main__'):
    
 
    #Fit and time LDA.
-   num_topics = 10
-   num_passes = 4
-   
-   start_time = time.time()
-   lda_dict = getDictionary(train_vocab)
-   print "Length of dictionary used for LDA dictionary is ", len(lda_dict)
-   lda = fit_lda(corpus, lda_dict,num_topics=num_topics,passes=num_passes)
-   print("Performed LDA in %f seconds" % (time.time() - start_time))
+   num_topics_list = np.arange(3,33,3)
+   num_passes = 3
+   train_error_data = []
+   test_error_data = []
+   perplexity_data = []
+   for num_topics in num_topics_list:
+      start_time = time.time()
+      lda_dict = getDictionary(train_vocab)
+      print("Extracting %d topics..." % num_topics) 
+      lda = fit_lda(corpus, lda_dict,num_topics=num_topics,passes=num_passes)
+      print("Performed LDA in %f seconds" % (time.time() - start_time))
 
-   #print out LDA topics
-   print_topics(lda,dictionary.keys(),num_topics)
+      #print out LDA topics
+      print_topics(lda,dictionary.keys(),num_topics)
 
-   #Log perplexity of test documents
-   log_perplexity_bound = lda.log_perplexity(test_bow_docs)
-   print "Lower bound on log perplexity: ", log_perplexity_bound
-   
-   #Get distribution of topics for training documents
-   train_topic_dists = getTopicDistributions(lda, corpus) 
-   train_topicDist_features = getTopicDistributionFeatures(train_topic_dists, num_topics)
+      #Log perplexity of test documents
+      log_perplexity_bound = lda.log_perplexity(test_bow_docs)
+      perplexity_bound = math.exp(log_perplexity_bound)
+      print "Lower bound on perplexity: ", perplexity_bound
+     
+       #Get distribution of topics for training documents
+      train_topic_dists = getTopicDistributions(lda, corpus) 
+      train_topicDist_features = getTopicDistributionFeatures(train_topic_dists, num_topics)
   
-   #Get distribution of topics for training documents
-   test_topic_dists = getTopicDistributions(lda, test_bow_docs) 
-   test_topicDist_features = getTopicDistributionFeatures(test_topic_dists, num_topics)
+      #Get distribution of topics for training documents
+      test_topic_dists = getTopicDistributions(lda, test_bow_docs) 
+      test_topicDist_features = getTopicDistributionFeatures(test_topic_dists, num_topics)
    
-   #Fit classifier
-   clf = fit_classifier(train_topicDist_features,train_labels)   
+      #Fit classifier
+      clf = fit_classifier(train_topicDist_features,train_labels)   
    
-   #Test classifier
-   train_preds = make_predictions(clf, train_topicDist_features)
-   test_preds = make_predictions(clf,test_topicDist_features)
+      #Test classifier
+      train_preds = make_predictions(clf, train_topicDist_features)
+      test_preds = make_predictions(clf,test_topicDist_features)
    
-   #Compute and display error rate
-   train_error = compute_error(train_preds, train_labels)
-   print "Training error using LDA topic distributions as features: ", train_error
+      #Compute and display error rate
+      train_error = compute_error(train_preds, train_labels)
+      print "Training error using LDA topic distributions as features: ", train_error
 
-   test_error = compute_error(test_preds, test_labels)
-   print "Test error using LDA topic distributions as features: ", test_error
+      test_error = compute_error(test_preds, test_labels)
+      print "Test error using LDA topic distributions as features: ", test_error
+      
+      perplexity_data.append(log_perplexity_bound)
+      train_error_data.append(train_error)
+      test_error_data.append(test_error)
+
+   plt.plot(num_topics_list, test_error_data, 'b-')
+   plt.figure()
+   plt.plot(num_topics_list, perplexity_data, 'r-')
+   plt.show()
