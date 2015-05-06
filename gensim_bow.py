@@ -1,5 +1,6 @@
 #https://gist.github.com/aronwc/8248457
 import numpy as np
+import scipy
 import time
 
 from gensim import matutils, corpora
@@ -9,7 +10,8 @@ from sklearn import svm
 from sklearn.datasets import fetch_20newsgroups
 from sklearn.feature_extraction.text import CountVectorizer
 from collections import defaultdict
-
+import string
+from stemming.porter2 import stem
 
 '''Machine learning methods''' 
 
@@ -41,16 +43,10 @@ def compute_error(predictions,labels):
 
 '''LDA methods'''
 
-def fit_lda(X, vocab, num_topics=5, passes=20):
-   """ Fit LDA from a scipy CSR matrix (X). """
+def fit_lda(corpus, dictionary, num_topics=5, passes=20):
    print 'fitting lda...'
-  
-   return LdaModel(matutils.Sparse2Corpus(X), num_topics=num_topics,
-   #return LdaModel(X, num_topics=num_topics,    
-                passes=passes,
-                    id2word=dict([(i, s) for i, s in enumerate(vocab)]))
- 
- 
+   return LdaModel(corpus, id2word=dictionary,num_topics=num_topics,passes=num_passes)  
+     
 def print_topics(lda, vocab, n=10):
    """ Print the top words for each topic. """
    topics = lda.show_topics(num_topics=n, formatted=False)
@@ -91,7 +87,14 @@ def process_documents(documents):
    #read in from file called stopwords.txt
    #each stopword on its own line
    stoplist = getStopWords()
-   texts = [[word for word in document.lower().split() if word not in stoplist] for document in documents]
+   stopChars = string.punctuation + "-*\\|___" + "0123456789"
+   stopChars_list = list(stopChars)
+   for doc in range(0,len(documents)):
+      document = documents[doc]
+      for punct in stopChars_list:
+         document = document.replace(punct,' ')
+      documents[doc] = document
+   texts = [[stem(word) for word in document.lower().split() if word not in stoplist] for document in documents]
 
    frequency = defaultdict(int)
    for text in texts:
@@ -101,15 +104,36 @@ def process_documents(documents):
    processed_texts = [[token for token in text if frequency[token] > 1] for text in texts]
    return processed_texts
 
-def getDictionary(texts):
-   return corpora.Dictionary(texts)
+def getDictionary(vocab):
+#   vocab_set = set()
+#   count = 0
+#   for text in texts:
+#      for word in text:
+#        count += 1
+#         vocab_set.add(word)
+#   vocab = sorted(list(vocab_set))
+   dictionary = dict([(i, s) for i, s in enumerate(vocab)])
+   #print dictionary
+   return dictionary
+   #return corpora.Dictionary(texts)
 
 def getCorpus(texts, dictionary):
    corpus = [dictionary.doc2bow(text) for text in texts]
    return corpus
 
-
-
+def sparse2bow(td_sparse_csr):
+   num_docs = td_sparse_csr.shape[0]
+   num_terms = td_sparse_csr.shape[1]
+   #td_sparse_csr = scipy.sparse.coo_matrix.tocsr(td_sparse)
+   documents = []
+   for doc in range(0,num_docs):
+      sparse_doc = td_sparse_csr.getrow(doc).todense()
+      document = []
+      for term in range(0,num_terms):
+         if sparse_doc[0,term] > 0:
+            document.append((term, sparse_doc[0,term]))
+      documents.append(document)
+   return documents
 '''Run program'''
  
 if (__name__ == '__main__'):
@@ -121,7 +145,10 @@ if (__name__ == '__main__'):
    all_data = fetch_20newsgroups(categories=cats,shuffle=True,random_state=rand, remove=('headers', 'footers', 'quotes'))
    train_proportion = 0.8
    train_data, test_data, train_labels, test_labels = trainTest_split(all_data, train_proportion)
-
+   vec = CountVectorizer(min_df=10, stop_words='english')
+   tdm_train = vec.fit_transform(train_data)
+   train_vocab = vec.get_feature_names()
+   tdm_test = vec.fit_transform(test_data)
    #Create bag of words representation of corpus
    #TODO: load and save dictionary, LDA model instead of recomputing each time (use gensim save and load methods)
    #https://radimrehurek.com/gensim/tut1.html   
@@ -130,21 +157,30 @@ if (__name__ == '__main__'):
    test_texts = process_documents(test_data) 
    
    #Dictionary and corpus used to fit LDA model must be based only off training data
-   dictionary = getDictionary(train_texts)
-   corpus = getCorpus(train_texts, dictionary)
-   test_bow_docs = getCorpus(test_texts, dictionary)
+   dictionary = corpora.Dictionary(train_texts)
+   #corpus = getCorpus(train_texts, dictionary)
+   #test_bow_docs = getCorpus(test_texts, dictionary)
+   corpus = sparse2bow(tdm_train)
+   test_bow_docs = sparse2bow(tdm_test)
+   
 
    #Fit and time LDA.
-   num_topics = 5
-   num_passes = 5
+   num_topics = 10
+   num_passes = 4
    
    start_time = time.time()
-   lda = LdaModel(corpus, id2word=dictionary,num_topics=num_topics,passes=num_passes)
+   lda_dict = getDictionary(train_vocab)
+   print "Length of dictionary used for LDA dictionary is ", len(lda_dict)
+   lda = fit_lda(corpus, lda_dict,num_topics=num_topics,passes=num_passes)
    print("Performed LDA in %f seconds" % (time.time() - start_time))
 
    #print out LDA topics
    print_topics(lda,dictionary.keys(),num_topics)
 
+   #Log perplexity of test documents
+   log_perplexity_bound = lda.log_perplexity(test_bow_docs)
+   print "Lower bound on log perplexity: ", log_perplexity_bound
+   
    #Get distribution of topics for training documents
    train_topic_dists = getTopicDistributions(lda, corpus) 
    train_topicDist_features = getTopicDistributionFeatures(train_topic_dists, num_topics)
@@ -153,7 +189,7 @@ if (__name__ == '__main__'):
    test_topic_dists = getTopicDistributions(lda, test_bow_docs) 
    test_topicDist_features = getTopicDistributionFeatures(test_topic_dists, num_topics)
    
-   #Fit classifier.
+   #Fit classifier
    clf = fit_classifier(train_topicDist_features,train_labels)   
    
    #Test classifier
